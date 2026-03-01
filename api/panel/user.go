@@ -91,6 +91,25 @@ func decodeAliveMap(body []byte) map[int]int {
 	return alive
 }
 
+func (c *Client) fetchAliveList(paths ...string) map[int]int {
+	for _, path := range paths {
+		r, err := c.client.R().
+			ForceContentType("application/json").
+			Get(path)
+		if err != nil || r == nil || r.RawResponse == nil {
+			continue
+		}
+		if r.StatusCode() >= 399 {
+			_ = r.RawResponse.Body.Close()
+			continue
+		}
+		_ = r.RawResponse.Body.Close()
+		return decodeAliveMap(r.Body())
+	}
+
+	return make(map[int]int)
+}
+
 // GetUserList will pull user from v2board
 func (c *Client) GetUserList() ([]UserInfo, error) {
 	switch c.PanelType {
@@ -179,21 +198,10 @@ func (c *Client) GetUserAlive() (map[int]int, error) {
 	default:
 		{
 			c.AliveMap = &AliveMap{}
-			const path = "/api/v1/server/UniProxy/alivelist"
-			r, err := c.client.R().
-				ForceContentType("application/json").
-				Get(path)
-			if err != nil || r.StatusCode() >= 399 {
-				c.AliveMap.Alive = make(map[int]int)
-				return c.AliveMap.Alive, nil
-			}
-			if r == nil || r.RawResponse == nil {
-				fmt.Printf("received nil response or raw response")
-				c.AliveMap.Alive = make(map[int]int)
-				return c.AliveMap.Alive, nil
-			}
-			defer r.RawResponse.Body.Close()
-			c.AliveMap.Alive = decodeAliveMap(r.Body())
+			c.AliveMap.Alive = c.fetchAliveList(
+				"/api/v1/server/UniProxy/alivelist",
+				"/api/v2/server/alivelist",
+			)
 
 			return c.AliveMap.Alive, nil
 		}
@@ -280,11 +288,24 @@ func (c *Client) ReportNodeOnlineUsers(data *map[int][]string) error {
 		}
 		return post(path, wrapper)
 	default:
-		const path = "/api/v1/server/UniProxy/alive"
-		if err := post(path, payload); err == nil {
-			return nil
+		paths := []string{
+			"/api/v1/server/UniProxy/alive",
+			"/api/v2/server/alive",
 		}
-		return post(path, wrapper)
+		var lastErr error
+		for _, path := range paths {
+			if err := post(path, payload); err == nil {
+				return nil
+			} else {
+				lastErr = err
+			}
+			if err := post(path, wrapper); err == nil {
+				return nil
+			} else {
+				lastErr = err
+			}
+		}
+		return lastErr
 	}
 
 }
