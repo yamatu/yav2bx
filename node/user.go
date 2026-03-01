@@ -75,21 +75,38 @@ func (c *Controller) reportUserTrafficTask() (err error) {
 			log.WithField("tag", c.tag).Infof("Total %d online users, %d Reported", len(*onlineDevice), len(result))
 		}
 	}
-	if c.apiClient.PanelType == "ppanel" {
-		CPU, Mem, Disk, Uptime, err := serverstatus.GetSystemInfo()
-		if err != nil {
-			log.Print(err)
+	status, statusErr := serverstatus.GetSystemStatus()
+	if statusErr != nil {
+		log.WithFields(log.Fields{
+			"tag": c.tag,
+			"err": statusErr,
+		}).Warn("Get system status failed")
+	}
+
+	nodeStatus := &panel.NodeStatus{}
+	if status != nil {
+		nodeStatus.CPU = status.CPU
+		nodeStatus.Uptime = status.Uptime
+		nodeStatus.MemTotal = status.MemTotal
+		nodeStatus.MemUsed = status.MemUsed
+		nodeStatus.SwapTotal = status.SwapTotal
+		nodeStatus.SwapUsed = status.SwapUsed
+		nodeStatus.DiskTotal = status.DiskTotal
+		nodeStatus.DiskUsed = status.DiskUsed
+		if status.MemTotal > 0 {
+			nodeStatus.Mem = float64(status.MemUsed) / float64(status.MemTotal) * 100
 		}
-		err = c.apiClient.ReportNodeStatus(
-			&panel.NodeStatus{
-				CPU:    CPU,
-				Mem:    Mem,
-				Disk:   Disk,
-				Uptime: Uptime,
-			})
-		if err != nil {
-			log.Print(err)
+		if status.DiskTotal > 0 {
+			nodeStatus.Disk = float64(status.DiskUsed) / float64(status.DiskTotal) * 100
 		}
+	}
+
+	err = c.apiClient.ReportNodeStatus(nodeStatus)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"tag": c.tag,
+			"err": err,
+		}).Info("Report node status failed")
 	}
 
 	userTraffic = nil

@@ -161,10 +161,16 @@ type ServerPushStatusRequest struct {
 }
 
 type NodeStatus struct {
-	CPU    float64
-	Mem    float64
-	Disk   float64
-	Uptime uint64
+	CPU       float64
+	Mem       float64
+	Disk      float64
+	Uptime    uint64
+	MemTotal  uint64
+	MemUsed   uint64
+	SwapTotal uint64
+	SwapUsed  uint64
+	DiskTotal uint64
+	DiskUsed  uint64
 }
 
 func (c *Client) GetNodeInfo() (node *NodeInfo, err error) {
@@ -449,7 +455,36 @@ func (c *Client) ReportNodeStatus(nodeStatus *NodeStatus) (err error) {
 		}
 		return nil
 	default:
-		return nil
+		payload := map[string]interface{}{
+			"cpu": nodeStatus.CPU,
+			"mem": map[string]uint64{
+				"total": nodeStatus.MemTotal,
+				"used":  nodeStatus.MemUsed,
+			},
+			"swap": map[string]uint64{
+				"total": nodeStatus.SwapTotal,
+				"used":  nodeStatus.SwapUsed,
+			},
+			"disk": map[string]uint64{
+				"total": nodeStatus.DiskTotal,
+				"used":  nodeStatus.DiskUsed,
+			},
+		}
+
+		paths := []string{
+			"/api/v1/server/UniProxy/status",
+			"/api/v2/server/status",
+		}
+		var lastErr error
+		for _, path := range paths {
+			r, reqErr := c.client.R().SetBody(payload).ForceContentType("application/json").Post(path)
+			if err = c.checkResponse(r, path, reqErr); err == nil {
+				return nil
+			}
+			lastErr = err
+		}
+
+		return lastErr
 	}
 
 }
