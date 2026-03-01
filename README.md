@@ -57,6 +57,8 @@ bash <(curl -Ls https://raw.githubusercontent.com/yamatu/yav2bx/main/install.sh)
 
 安装脚本会自动写入 systemd 服务，并保留你已有的 `/etc/V2bX/config.json`。首次安装会额外放置 XHTTP 示例配置：
 
+若仓库暂未发布 Release，脚本会自动切换为源码编译安装（默认包含 xray 内核编译标签），同样可用 xhttp。
+
 - `/etc/V2bX/config_xhttp_reality.json`
 - `/etc/V2bX/xhttp_template.conf`
 

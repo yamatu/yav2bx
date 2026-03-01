@@ -7,6 +7,9 @@ BIN_NAME="V2bX"
 INSTALL_DIR="/usr/local/V2bX"
 CONFIG_DIR="/etc/V2bX"
 SERVICE_FILE="/etc/systemd/system/V2bX.service"
+INSTALL_MODE="release"
+VERSION=""
+SOURCE_REF="main"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -149,17 +152,20 @@ detect_asset_arch() {
 }
 
 resolve_version() {
+  SOURCE_REF="${1:-main}"
   if [[ $# -gt 0 && -n "${1:-}" ]]; then
     VERSION="$1"
+    INSTALL_MODE="release"
     return
   fi
 
-  VERSION="$(curl -fsSL "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest" | sed -n 's/.*"tag_name": "\([^"]*\)".*/\1/p' | head -n 1)"
+  VERSION="$(curl -fsSL "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest" 2>/dev/null | sed -n 's/.*"tag_name": "\([^"]*\)".*/\1/p' | head -n 1 || true)"
   if [[ -z "$VERSION" ]]; then
-    log_error "Failed to query latest release from GitHub API"
-    log_error "Please rerun with an explicit version, e.g. bash install.sh v1.0.0"
-    exit 1
+    INSTALL_MODE="source"
+    log_warn "No GitHub release found. Fallback to source build from main branch."
+    return
   fi
+  INSTALL_MODE="release"
 }
 
 install_binary() {
@@ -173,8 +179,8 @@ install_binary() {
   log_info "Downloading ${download_url}"
   if ! curl -fL --retry 3 --connect-timeout 15 -o "$zip_file" "$download_url"; then
     rm -f "$zip_file"
-    log_error "Download failed: ${download_url}"
-    exit 1
+    log_warn "Release asset not found or download failed: ${download_url}"
+    return 1
   fi
 
   rm -rf "$INSTALL_DIR"
@@ -185,6 +191,75 @@ install_binary() {
   chmod +x "$INSTALL_DIR/$BIN_NAME"
   ln -sf "$INSTALL_DIR/$BIN_NAME" /usr/bin/V2bX
   ln -sf /usr/bin/V2bX /usr/bin/v2bx
+}
+
+install_build_tools() {
+  case "$RELEASE" in
+    debian)
+      apt-get install -y git golang
+      ;;
+    centos)
+      if command -v dnf >/dev/null 2>&1; then
+        dnf install -y git golang
+      else
+        yum install -y git golang
+      fi
+      ;;
+    alpine)
+      apk add --no-cache git go
+      ;;
+    arch)
+      pacman -Sy --noconfirm --needed git go
+      ;;
+  esac
+}
+
+install_from_source() {
+  local ref="$1"
+  local src_dir
+  src_dir="$(mktemp -d /tmp/v2bx-src.XXXXXX)"
+
+  log_info "Installing from source ref: ${ref}"
+  install_build_tools
+
+  if ! git clone --depth 1 "https://github.com/${REPO_OWNER}/${REPO_NAME}.git" "$src_dir"; then
+    rm -rf "$src_dir"
+    log_error "Failed to clone source repository"
+    exit 1
+  fi
+
+  rm -rf "$INSTALL_DIR"
+  mkdir -p "$INSTALL_DIR"
+
+  (
+    cd "$src_dir"
+    if [[ "$ref" != "main" ]]; then
+      git fetch --depth 1 origin "$ref" >/dev/null 2>&1 || true
+      if ! git checkout "$ref" >/dev/null 2>&1; then
+        log_warn "Cannot checkout '${ref}', continue with main branch"
+      fi
+    fi
+    export CGO_ENABLED=0
+    go mod download
+    go build -v -o "$INSTALL_DIR/$BIN_NAME" -tags "xray sing hysteria2 with_reality_server with_quic with_grpc with_utls with_wireguard with_acme with_gvisor" -trimpath -ldflags "-s -w -buildid="
+  )
+
+  chmod +x "$INSTALL_DIR/$BIN_NAME"
+  ln -sf "$INSTALL_DIR/$BIN_NAME" /usr/bin/V2bX
+  ln -sf /usr/bin/V2bX /usr/bin/v2bx
+
+  if [[ -d "$src_dir/example" ]]; then
+    for file in config.json dns.json route.json custom_outbound.json custom_inbound.json config_xhttp_reality.json geoip.dat geosite.dat; do
+      if [[ -f "$src_dir/example/$file" ]]; then
+        cp -f "$src_dir/example/$file" "$INSTALL_DIR/$file"
+      fi
+    done
+  fi
+  if [[ -f "$src_dir/xhttp配置模板.conf" ]]; then
+    cp -f "$src_dir/xhttp配置模板.conf" "$INSTALL_DIR/xhttp配置模板.conf"
+  fi
+
+  rm -rf "$src_dir"
 }
 
 copy_if_missing() {
@@ -263,8 +338,16 @@ main() {
     had_config="1"
   fi
 
-  log_info "Installing ${BIN_NAME} ${VERSION} (${ASSET_ARCH})"
-  install_binary "$VERSION"
+  if [[ "$INSTALL_MODE" == "release" ]]; then
+    log_info "Installing ${BIN_NAME} ${VERSION} (${ASSET_ARCH})"
+    if ! install_binary "$VERSION"; then
+      log_warn "Fallback to source build because release package is unavailable"
+      install_from_source "$SOURCE_REF"
+    fi
+  else
+    install_from_source "$SOURCE_REF"
+  fi
+
   install_assets
   install_service
 
