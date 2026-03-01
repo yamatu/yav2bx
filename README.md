@@ -90,6 +90,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/yamatu/yav2bx/main/install.sh)
 - `network_settings` 可参考仓库内的 `xhttp配置模板.conf`。
 - 完整示例可参考 `example/config_xhttp_reality.json`。
 - 若面板的 `headers`/`sockopt`/`tlsSettings` 传空数组（`[]`），会导致 xray 报错；建议面板侧传对象（`{}`）。
+- 若 `mode=stream-one` 且面板仍下发了 `downloadSettings`，后端会自动忽略该字段以避免启动失败。
 
 ### 手动安装
 

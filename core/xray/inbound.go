@@ -327,12 +327,35 @@ func normalizeXHTTPSettings(raw json.RawMessage) json.RawMessage {
 	}
 
 	payload = normalizeXHTTPValue(payload)
+	payload = normalizeXHTTPModeCompat(payload)
 
 	normalized, err := json.Marshal(payload)
 	if err != nil {
 		return raw
 	}
 	return normalized
+}
+
+func normalizeXHTTPModeCompat(v interface{}) interface{} {
+	obj, ok := v.(map[string]interface{})
+	if !ok {
+		return v
+	}
+
+	mode, _ := obj["mode"].(string)
+	if strings.EqualFold(strings.TrimSpace(mode), "stream-one") {
+		// Xray core does not allow downloadSettings in stream-one mode.
+		// For compatibility with panel templates, silently drop it.
+		delete(obj, "downloadSettings")
+		if extraAny, ok := obj["extra"]; ok {
+			if extra, ok := extraAny.(map[string]interface{}); ok {
+				delete(extra, "downloadSettings")
+				obj["extra"] = extra
+			}
+		}
+	}
+
+	return obj
 }
 
 func normalizeXHTTPValue(v interface{}) interface{} {
