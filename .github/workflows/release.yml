@@ -1,11 +1,17 @@
 name: Build and Release
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
   push:
     branches:
+      - main
       - master
       - dev_new
+    tags:
+      - "v*"
     paths:
       - "**/*.go"
       - "go.mod"
@@ -109,7 +115,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24.1'
+          go-version: '1.25.2'
 
       - name: Get project dependencies
         run: |
@@ -118,8 +124,12 @@ jobs:
         if: ${{ github.event_name == 'release' }}
         run: |
           echo "version=$(echo $GITHUB_REF | cut -d / -f 3)" >> $GITHUB_ENV
+      - name: Get tag version
+        if: ${{ github.event_name != 'release' && startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          echo "version=$(echo $GITHUB_REF | cut -d / -f 3)" >> $GITHUB_ENV
       - name: Get other version
-        if: ${{ github.event_name != 'release' }}
+        if: ${{ github.event_name != 'release' && !startsWith(github.ref, 'refs/tags/') }}
         run: |
           echo "version=${{ github.sha }}" >> $GITHUB_ENV
       - name: Build V2bX
@@ -143,6 +153,7 @@ jobs:
           cp ${GITHUB_WORKSPACE}/README.md ./build_assets/README.md
           cp ${GITHUB_WORKSPACE}/LICENSE ./build_assets/LICENSE
           cp ${GITHUB_WORKSPACE}/example/*.json ./build_assets/
+          cp ${GITHUB_WORKSPACE}/xhttp配置模板.conf ./build_assets/ || true
           LIST=('geoip' 'geosite')
           for i in "${LIST[@]}"
           do
@@ -175,7 +186,7 @@ jobs:
             ./V2bX-${{ steps.get_filename.outputs.ASSET_NAME }}/*
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ./V2bX-${{ steps.get_filename.outputs.ASSET_NAME }}.zip*
