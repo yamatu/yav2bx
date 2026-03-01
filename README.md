@@ -87,6 +87,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/yamatu/yav2bx/main/install.sh)
 - 面板节点请使用 `vless` 协议并将 `network` 设为 `xhttp`。
 - `network_settings` 可参考仓库内的 `xhttp配置模板.conf`。
 - 完整示例可参考 `example/config_xhttp_reality.json`。
+- 若面板的 `headers`/`sockopt` 传空数组（`[]`），会导致 xray 报错；建议面板侧传对象（`{}`）。
 
 ### 手动安装
 

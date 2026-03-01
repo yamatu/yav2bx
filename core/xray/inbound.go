@@ -321,18 +321,12 @@ func normalizeXHTTPSettings(raw json.RawMessage) json.RawMessage {
 		return raw
 	}
 
-	var payload map[string]interface{}
+	var payload interface{}
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return raw
 	}
 
-	normalizeHeaderField(payload, "headers")
-	if extraAny, ok := payload["extra"]; ok {
-		if extra, ok := extraAny.(map[string]interface{}); ok {
-			normalizeHeaderField(extra, "headers")
-			payload["extra"] = extra
-		}
-	}
+	payload = normalizeXHTTPValue(payload)
 
 	normalized, err := json.Marshal(payload)
 	if err != nil {
@@ -341,21 +335,34 @@ func normalizeXHTTPSettings(raw json.RawMessage) json.RawMessage {
 	return normalized
 }
 
-func normalizeHeaderField(obj map[string]interface{}, key string) {
-	v, ok := obj[key]
-	if !ok {
-		return
+func normalizeXHTTPValue(v interface{}) interface{} {
+	switch t := v.(type) {
+	case map[string]interface{}:
+		for k, child := range t {
+			t[k] = normalizeXHTTPValue(child)
+			switch strings.ToLower(k) {
+			case "headers":
+				if arr, ok := t[k].([]interface{}); ok {
+					t[k] = headersArrayToMap(arr)
+				}
+			case "sockopt":
+				if _, ok := t[k].([]interface{}); ok {
+					t[k] = map[string]interface{}{}
+				}
+			}
+		}
+		return t
+	case []interface{}:
+		for i := range t {
+			t[i] = normalizeXHTTPValue(t[i])
+		}
+		return t
+	default:
+		return t
 	}
+}
 
-	if _, ok := v.(map[string]interface{}); ok {
-		return
-	}
-
-	arr, ok := v.([]interface{})
-	if !ok {
-		return
-	}
-
+func headersArrayToMap(arr []interface{}) map[string]interface{} {
 	headers := make(map[string]interface{})
 	for _, item := range arr {
 		switch h := item.(type) {
@@ -377,8 +384,7 @@ func normalizeHeaderField(obj map[string]interface{}, key string) {
 			headers[k] = strings.TrimSpace(val)
 		}
 	}
-
-	obj[key] = headers
+	return headers
 }
 
 func pickHeaderString(m map[string]interface{}, keys ...string) string {
