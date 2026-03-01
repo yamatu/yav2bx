@@ -1,0 +1,34 @@
+{
+  "Log": { "Level": "info", "Output": "" },
+  "Cores": [
+    {
+      "Type": "xray",
+      "Log": { "Level": "warn" },
+      "AssetPath": "/etc/V2bX/",
+      "DnsConfigPath": "/etc/V2bX/dns.json",
+      "RouteConfigPath": "/etc/V2bX/route.json"
+    }
+  ],
+  "Nodes": [
+    {
+      "Name": "xhttp-reality-demo",
+      "Core": "xray",
+      "ApiHost": "https://yamatu.xyz:7001",
+      "ApiKey": "wocaonimabde13333123",
+      "NodeID": 186,
+      "NodeType": "vless",
+      "Timeout": 30,
+      "ListenIP": "0.0.0.0",
+      "SendIP": "0.0.0.0",
+      "EnableProxyProtocol": false,
+      "EnableTFO": true,
+      "EnableDNS": true,
+      "DNSType": "UseIPv4",
+      "DisableSniffing": false,
+      "CertConfig": {
+        "CertMode": "none",
+        "RejectUnknownSni": false
+      }
+    }
+  ]
+}
