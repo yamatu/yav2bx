@@ -346,9 +346,6 @@ install_from_source() {
       fi
     done
   fi
-  if [[ -f "$src_dir/xhttp配置模板.conf" ]]; then
-    cp -f "$src_dir/xhttp配置模板.conf" "$INSTALL_DIR/xhttp配置模板.conf"
-  fi
   if [[ -f "$src_dir/V2bX.sh" ]]; then
     cp -f "$src_dir/V2bX.sh" "$INSTALL_DIR/V2bX.sh"
   fi
@@ -365,6 +362,51 @@ copy_if_missing() {
   if [[ -f "$src" && ! -f "$dst" ]]; then
     cp -f "$src" "$dst"
   fi
+}
+
+write_default_xhttp_template() {
+  local dst="$1"
+  cat > "$dst" <<'EOF'
+{
+  "host": "example.com",
+  "path": "/yourpath",
+  "mode": "auto",
+  "extra": {
+    "headers": {
+      "User-Agent": "Mozilla/5.0"
+    },
+    "xPaddingBytes": "100-1000",
+    "noGRPCHeader": false,
+    "noSSEHeader": false,
+    "scMaxEachPostBytes": 1000000,
+    "scMinPostsIntervalMs": 30,
+    "scMaxBufferedPosts": 30,
+    "xmux": {
+      "maxConcurrency": "8-16",
+      "maxConnections": 0,
+      "cMaxReuseTimes": 0,
+      "cMaxLifetimeMs": 0,
+      "hMaxRequestTimes": "600-900",
+      "hKeepAlivePeriod": 0
+    },
+    "downloadSettings": {
+      "address": "example.com",
+      "port": 443,
+      "network": "xhttp",
+      "security": "tls",
+      "tlsSettings": {
+        "serverName": "example.com"
+      },
+      "xhttpSettings": {
+        "path": "/yourpath"
+      },
+      "sockopt": {
+        "mark": 0
+      }
+    }
+  }
+}
+EOF
 }
 
 install_assets() {
@@ -385,10 +427,10 @@ install_assets() {
   copy_if_missing "$INSTALL_DIR/config_xhttp_reality.json" "$CONFIG_DIR/config_xhttp_reality.json"
 
   if [[ ! -f "$CONFIG_DIR/xhttp_template.conf" ]]; then
-    if [[ -f "$INSTALL_DIR/xhttp配置模板.conf" ]]; then
-      cp -f "$INSTALL_DIR/xhttp配置模板.conf" "$CONFIG_DIR/xhttp_template.conf"
+    if [[ -f "$INSTALL_DIR/xhttp_template.conf" ]]; then
+      cp -f "$INSTALL_DIR/xhttp_template.conf" "$CONFIG_DIR/xhttp_template.conf"
     else
-      curl -fsSL "https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/xhttp%E9%85%8D%E7%BD%AE%E6%A8%A1%E6%9D%BF.conf" -o "$CONFIG_DIR/xhttp_template.conf" || true
+      write_default_xhttp_template "$CONFIG_DIR/xhttp_template.conf"
     fi
   fi
 }

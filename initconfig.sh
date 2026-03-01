@@ -133,6 +133,51 @@ prompt_cert_mode() {
   done
 }
 
+write_default_xhttp_template() {
+  local dst="$1"
+  cat > "$dst" <<'EOF'
+{
+  "host": "example.com",
+  "path": "/yourpath",
+  "mode": "auto",
+  "extra": {
+    "headers": {
+      "User-Agent": "Mozilla/5.0"
+    },
+    "xPaddingBytes": "100-1000",
+    "noGRPCHeader": false,
+    "noSSEHeader": false,
+    "scMaxEachPostBytes": 1000000,
+    "scMinPostsIntervalMs": 30,
+    "scMaxBufferedPosts": 30,
+    "xmux": {
+      "maxConcurrency": "8-16",
+      "maxConnections": 0,
+      "cMaxReuseTimes": 0,
+      "cMaxLifetimeMs": 0,
+      "hMaxRequestTimes": "600-900",
+      "hKeepAlivePeriod": 0
+    },
+    "downloadSettings": {
+      "address": "example.com",
+      "port": 443,
+      "network": "xhttp",
+      "security": "tls",
+      "tlsSettings": {
+        "serverName": "example.com"
+      },
+      "xhttpSettings": {
+        "path": "/yourpath"
+      },
+      "sockopt": {
+        "mark": 0
+      }
+    }
+  }
+}
+EOF
+}
+
 ensure_sidecar_files() {
   mkdir -p "$CONFIG_DIR"
   for file in dns.json route.json custom_outbound.json custom_inbound.json config_xhttp_reality.json; do
@@ -143,8 +188,8 @@ ensure_sidecar_files() {
   if [[ ! -f "$CONFIG_DIR/xhttp_template.conf" ]]; then
     if [[ -f "$INSTALL_DIR/xhttp_template.conf" ]]; then
       cp -f "$INSTALL_DIR/xhttp_template.conf" "$CONFIG_DIR/xhttp_template.conf"
-    elif [[ -f "$INSTALL_DIR/xhttp配置模板.conf" ]]; then
-      cp -f "$INSTALL_DIR/xhttp配置模板.conf" "$CONFIG_DIR/xhttp_template.conf"
+    else
+      write_default_xhttp_template "$CONFIG_DIR/xhttp_template.conf"
     fi
   fi
 }
