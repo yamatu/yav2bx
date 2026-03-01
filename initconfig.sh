@@ -16,11 +16,11 @@ wizard_info() {
 }
 
 wizard_warn() {
-  printf "%b[WARN]%b %s\n" "$YELLOW" "$PLAIN" "$1"
+  printf "%b[WARN]%b %s\n" "$YELLOW" "$PLAIN" "$1" >&2
 }
 
 wizard_error() {
-  printf "%b[ERROR]%b %s\n" "$RED" "$PLAIN" "$1"
+  printf "%b[ERROR]%b %s\n" "$RED" "$PLAIN" "$1" >&2
 }
 
 prompt_non_empty() {
@@ -52,11 +52,11 @@ prompt_yes_no() {
 
 prompt_node_type() {
   local n
-  echo "请选择节点协议类型:"
-  echo "1) vless (推荐，可配 xhttp/reality)"
-  echo "2) vmess"
-  echo "3) trojan"
-  echo "4) shadowsocks"
+  echo "请选择节点协议类型:" >&2
+  echo "1) vless (推荐，可配 xhttp/reality)" >&2
+  echo "2) vmess" >&2
+  echo "3) trojan" >&2
+  echo "4) shadowsocks" >&2
   while true; do
     read -r -p "输入 [1-4]: " n
     case "$n" in
@@ -71,11 +71,11 @@ prompt_node_type() {
 
 prompt_cert_mode() {
   local n
-  echo "请选择证书模式:"
-  echo "1) none"
-  echo "2) http"
-  echo "3) dns"
-  echo "4) file"
+  echo "请选择证书模式:" >&2
+  echo "1) none" >&2
+  echo "2) http" >&2
+  echo "3) dns" >&2
+  echo "4) file" >&2
   while true; do
     read -r -p "输入 [1-4]: " n
     case "$n" in

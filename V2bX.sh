@@ -224,7 +224,7 @@ pick_editor() {
     echo "$EDITOR"
     return
   fi
-  for e in nano vim vi; do
+  for e in vim nvim vi nano; do
     if has_cmd "$e"; then
       echo "$e"
       return
