@@ -28,6 +28,10 @@ log_error() {
   printf "%b[ERROR]%b %s\n" "$RED" "$PLAIN" "$1"
 }
 
+has_cmd() {
+  command -v "$1" >/dev/null 2>&1
+}
+
 require_root() {
   if [[ ${EUID:-0} -ne 0 ]]; then
     log_error "Please run this script as root"
@@ -73,27 +77,76 @@ detect_release() {
 }
 
 install_base() {
+  if [[ "${V2BX_SKIP_BASE_INSTALL:-0}" == "1" ]]; then
+    log_warn "Skip base package install (V2BX_SKIP_BASE_INSTALL=1)"
+    return
+  fi
+
+  local -a missing_pkgs
+  missing_pkgs=()
+
   case "$RELEASE" in
     debian)
+      has_cmd curl || missing_pkgs+=(curl)
+      has_cmd wget || missing_pkgs+=(wget)
+      has_cmd unzip || missing_pkgs+=(unzip)
+      has_cmd tar || missing_pkgs+=(tar)
+      [[ -f /etc/ssl/certs/ca-certificates.crt ]] || missing_pkgs+=(ca-certificates)
+
+      if [[ ${#missing_pkgs[@]} -eq 0 ]]; then
+        log_info "Base dependencies already present, skip apt install"
+        return
+      fi
+
       apt-get update -y
-      apt-get install -y curl wget unzip tar ca-certificates
+      DEBIAN_FRONTEND=noninteractive apt-get install -y "${missing_pkgs[@]}"
       update-ca-certificates || true
       ;;
     centos)
+      has_cmd curl || missing_pkgs+=(curl)
+      has_cmd wget || missing_pkgs+=(wget)
+      has_cmd unzip || missing_pkgs+=(unzip)
+      has_cmd tar || missing_pkgs+=(tar)
+
+      if [[ ${#missing_pkgs[@]} -eq 0 ]]; then
+        log_info "Base dependencies already present, skip yum/dnf install"
+        return
+      fi
+
       if command -v dnf >/dev/null 2>&1; then
-        dnf install -y curl wget unzip tar ca-certificates
+        dnf install -y "${missing_pkgs[@]}" ca-certificates
       else
         yum install -y epel-release || true
-        yum install -y curl wget unzip tar ca-certificates
+        yum install -y "${missing_pkgs[@]}" ca-certificates
       fi
       update-ca-trust force-enable || true
       ;;
     alpine)
-      apk add --no-cache curl wget unzip tar ca-certificates
+      has_cmd curl || missing_pkgs+=(curl)
+      has_cmd wget || missing_pkgs+=(wget)
+      has_cmd unzip || missing_pkgs+=(unzip)
+      has_cmd tar || missing_pkgs+=(tar)
+
+      if [[ ${#missing_pkgs[@]} -eq 0 ]]; then
+        log_info "Base dependencies already present, skip apk install"
+        return
+      fi
+
+      apk add --no-cache "${missing_pkgs[@]}" ca-certificates
       update-ca-certificates || true
       ;;
     arch)
-      pacman -Sy --noconfirm --needed curl wget unzip tar ca-certificates
+      has_cmd curl || missing_pkgs+=(curl)
+      has_cmd wget || missing_pkgs+=(wget)
+      has_cmd unzip || missing_pkgs+=(unzip)
+      has_cmd tar || missing_pkgs+=(tar)
+
+      if [[ ${#missing_pkgs[@]} -eq 0 ]]; then
+        log_info "Base dependencies already present, skip pacman install"
+        return
+      fi
+
+      pacman -Sy --noconfirm --needed "${missing_pkgs[@]}" ca-certificates
       ;;
   esac
 }
@@ -194,22 +247,47 @@ install_binary() {
 }
 
 install_build_tools() {
+  if [[ "${V2BX_SKIP_BUILD_DEPS:-0}" == "1" ]]; then
+    log_warn "Skip build dependencies install (V2BX_SKIP_BUILD_DEPS=1)"
+    return
+  fi
+
+  local -a missing_build
+  missing_build=()
+  has_cmd git || missing_build+=(git)
+  has_cmd go || missing_build+=(golang)
+
+  if [[ ${#missing_build[@]} -eq 0 ]]; then
+    log_info "Build dependencies already present"
+    return
+  fi
+
   case "$RELEASE" in
     debian)
-      apt-get install -y git golang
+      DEBIAN_FRONTEND=noninteractive apt-get install -y "${missing_build[@]}"
       ;;
     centos)
       if command -v dnf >/dev/null 2>&1; then
-        dnf install -y git golang
+        dnf install -y "${missing_build[@]}"
       else
-        yum install -y git golang
+        yum install -y "${missing_build[@]}"
       fi
       ;;
     alpine)
-      apk add --no-cache git go
+      for i in "${!missing_build[@]}"; do
+        if [[ "${missing_build[$i]}" == "golang" ]]; then
+          missing_build[$i]="go"
+        fi
+      done
+      apk add --no-cache "${missing_build[@]}"
       ;;
     arch)
-      pacman -Sy --noconfirm --needed git go
+      for i in "${!missing_build[@]}"; do
+        if [[ "${missing_build[$i]}" == "golang" ]]; then
+          missing_build[$i]="go"
+        fi
+      done
+      pacman -Sy --noconfirm --needed "${missing_build[@]}"
       ;;
   esac
 }
