@@ -239,7 +239,8 @@ func buildV2ray(config *conf.Options, nodeInfo *panel.NodeInfo, inbound *coreCon
 			return fmt.Errorf("unmarshal httpupgrade settings error: %s", err)
 		}
 	case "splithttp", "xhttp":
-		err := json.Unmarshal(v.NetworkSettings, &inbound.StreamSetting.SplitHTTPSettings)
+		normalized := normalizeXHTTPSettings(v.NetworkSettings)
+		err := json.Unmarshal(normalized, &inbound.StreamSetting.SplitHTTPSettings)
 		if err != nil {
 			return fmt.Errorf("unmarshal xhttp settings error: %s", err)
 		}
@@ -313,6 +314,83 @@ func splitAndFilter(input string) []string {
 		}
 	}
 	return out
+}
+
+func normalizeXHTTPSettings(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 {
+		return raw
+	}
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return raw
+	}
+
+	normalizeHeaderField(payload, "headers")
+	if extraAny, ok := payload["extra"]; ok {
+		if extra, ok := extraAny.(map[string]interface{}); ok {
+			normalizeHeaderField(extra, "headers")
+			payload["extra"] = extra
+		}
+	}
+
+	normalized, err := json.Marshal(payload)
+	if err != nil {
+		return raw
+	}
+	return normalized
+}
+
+func normalizeHeaderField(obj map[string]interface{}, key string) {
+	v, ok := obj[key]
+	if !ok {
+		return
+	}
+
+	if _, ok := v.(map[string]interface{}); ok {
+		return
+	}
+
+	arr, ok := v.([]interface{})
+	if !ok {
+		return
+	}
+
+	headers := make(map[string]interface{})
+	for _, item := range arr {
+		switch h := item.(type) {
+		case map[string]interface{}:
+			k := pickHeaderString(h, "name", "key", "header")
+			if k == "" {
+				continue
+			}
+			headers[k] = pickHeaderString(h, "value", "val", "v")
+		case string:
+			k, val, ok := strings.Cut(h, ":")
+			if !ok {
+				continue
+			}
+			k = strings.TrimSpace(k)
+			if k == "" {
+				continue
+			}
+			headers[k] = strings.TrimSpace(val)
+		}
+	}
+
+	obj[key] = headers
+}
+
+func pickHeaderString(m map[string]interface{}, keys ...string) string {
+	for _, k := range keys {
+		if v, ok := m[k]; ok {
+			s, ok := v.(string)
+			if ok {
+				return strings.TrimSpace(s)
+			}
+		}
+	}
+	return ""
 }
 
 func buildShadowsocks(config *conf.Options, nodeInfo *panel.NodeInfo, inbound *coreConf.InboundDetourConfig) error {
