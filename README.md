@@ -89,7 +89,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/yamatu/yav2bx/main/install.sh)
 - 若你的面板把 `host/port/sni/tls/flow` 拆到外层字段，请在外层填写；`network_settings` 只填 xhttp 细节参数。
 - `network_settings` 可参考仓库内的 `xhttp配置模板.conf`。
 - 完整示例可参考 `example/config_xhttp_reality.json`。
-- 若面板的 `headers`/`sockopt` 传空数组（`[]`），会导致 xray 报错；建议面板侧传对象（`{}`）。
+- 若面板的 `headers`/`sockopt`/`tlsSettings` 传空数组（`[]`），会导致 xray 报错；建议面板侧传对象（`{}`）。
 
 ### 手动安装
 

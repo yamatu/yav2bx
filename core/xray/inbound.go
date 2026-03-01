@@ -345,7 +345,7 @@ func normalizeXHTTPValue(v interface{}) interface{} {
 				if arr, ok := t[k].([]interface{}); ok {
 					t[k] = headersArrayToMap(arr)
 				}
-			case "sockopt":
+			case "sockopt", "tlssettings", "xhttpsettings", "downloadsettings", "xmux":
 				if _, ok := t[k].([]interface{}); ok {
 					t[k] = map[string]interface{}{}
 				}
