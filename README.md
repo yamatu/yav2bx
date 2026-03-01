@@ -49,13 +49,16 @@ A V2board node server based on multi core, modified from XrayR.
 ### 一键安装
 
 ```
-bash <(curl -Ls https://raw.githubusercontent.com/yamatu/yav2bx/main/install.sh)
+wget -N https://raw.githubusercontent.com/yamatu/yav2bx/main/install.sh && bash install.sh
 
 # 安装指定版本
-bash <(curl -Ls https://raw.githubusercontent.com/yamatu/yav2bx/main/install.sh) v1.0.0
+bash install.sh v1.0.1
 
 # 系统 apt/dpkg 异常时，跳过基础依赖安装
-V2BX_SKIP_BASE_INSTALL=1 bash <(curl -Ls https://raw.githubusercontent.com/yamatu/yav2bx/main/install.sh)
+V2BX_SKIP_BASE_INSTALL=1 bash install.sh v1.0.1
+
+# 或者使用 curl 管道方式
+bash <(curl -Ls https://raw.githubusercontent.com/yamatu/yav2bx/main/install.sh) v1.0.1
 ```
 
 安装脚本会自动写入 systemd 服务，并保留你已有的 `/etc/V2bX/config.json`。首次安装会额外放置 XHTTP 示例配置：
