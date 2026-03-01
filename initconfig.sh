@@ -36,6 +36,17 @@ prompt_non_empty() {
   done
 }
 
+prompt_with_default() {
+  local prompt="$1"
+  local default_value="$2"
+  local value
+  read -r -p "$prompt [默认: ${default_value}]: " value
+  if [[ -z "$value" ]]; then
+    value="$default_value"
+  fi
+  printf '%s' "$value"
+}
+
 prompt_yes_no() {
   local prompt="$1"
   local default_yes="$2"
@@ -160,6 +171,8 @@ generate_config_file() {
   local node_choice
   local cert_mode
   local cert_domain
+  local cert_file
+  local cert_key
   local node_name
   local node_type
   local transport_mode
@@ -211,6 +224,8 @@ generate_config_file() {
     security_mode="none"
     cert_mode="none"
     cert_domain=""
+    cert_file="/etc/V2bX/fullchain.cer"
+    cert_key="/etc/V2bX/cert.key"
 
     if [[ "$node_choice" == "vless_xhttp" ]]; then
       node_type="vless"
@@ -223,6 +238,12 @@ generate_config_file() {
           cert_mode="$(prompt_cert_mode)"
         done
         cert_domain="$(prompt_non_empty '请输入证书域名(例如 node.example.com): ')"
+        if [[ "$cert_mode" == "file" ]]; then
+          cert_file="$(prompt_with_default '请输入证书文件路径(fullchain.cer)' '/etc/V2bX/fullchain.cer')"
+          cert_key="$(prompt_with_default '请输入私钥文件路径(cert.key)' '/etc/V2bX/cert.key')"
+          [[ -f "$cert_file" ]] || wizard_warn "证书文件不存在: $cert_file"
+          [[ -f "$cert_key" ]] || wizard_warn "私钥文件不存在: $cert_key"
+        fi
       else
         cert_mode="none"
       fi
@@ -236,6 +257,12 @@ generate_config_file() {
           cert_mode="$(prompt_cert_mode)"
         done
         cert_domain="$(prompt_non_empty '请输入证书域名(例如 node.example.com): ')"
+        if [[ "$cert_mode" == "file" ]]; then
+          cert_file="$(prompt_with_default '请输入证书文件路径(fullchain.cer)' '/etc/V2bX/fullchain.cer')"
+          cert_key="$(prompt_with_default '请输入私钥文件路径(cert.key)' '/etc/V2bX/cert.key')"
+          [[ -f "$cert_file" ]] || wizard_warn "证书文件不存在: $cert_file"
+          [[ -f "$cert_key" ]] || wizard_warn "私钥文件不存在: $cert_key"
+        fi
       elif [[ "$security_mode" == "reality" ]]; then
         cert_mode="none"
       fi
@@ -244,6 +271,12 @@ generate_config_file() {
         cert_mode="$(prompt_cert_mode)"
         if [[ "$cert_mode" != "none" ]]; then
           cert_domain="$(prompt_non_empty '请输入证书域名(例如 node.example.com): ')"
+          if [[ "$cert_mode" == "file" ]]; then
+            cert_file="$(prompt_with_default '请输入证书文件路径(fullchain.cer)' '/etc/V2bX/fullchain.cer')"
+            cert_key="$(prompt_with_default '请输入私钥文件路径(cert.key)' '/etc/V2bX/cert.key')"
+            [[ -f "$cert_file" ]] || wizard_warn "证书文件不存在: $cert_file"
+            [[ -f "$cert_key" ]] || wizard_warn "私钥文件不存在: $cert_key"
+          fi
         fi
       fi
     fi
@@ -267,8 +300,8 @@ generate_config_file() {
         \"CertMode\": \"${cert_mode}\",
         \"RejectUnknownSni\": false,
         \"CertDomain\": \"${cert_domain}\",
-        \"CertFile\": \"/etc/V2bX/fullchain.cer\",
-        \"KeyFile\": \"/etc/V2bX/cert.key\",
+        \"CertFile\": \"${cert_file}\",
+        \"KeyFile\": \"${cert_key}\",
         \"Provider\": \"cloudflare\",
         \"Email\": \"admin@example.com\",
         \"DNSEnv\": {
