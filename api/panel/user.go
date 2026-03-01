@@ -136,6 +136,7 @@ func (c *Client) GetUserList() ([]UserInfo, error) {
 			if err := json.Unmarshal(r.Body(), userlist); err != nil {
 				return nil, fmt.Errorf("unmarshal user list error: %w", err)
 			}
+			c.UserList = userlist
 			c.userEtag = r.Header().Get("ETag")
 			return userlist.Users, nil
 		}
@@ -162,6 +163,7 @@ func (c *Client) GetUserList() ([]UserInfo, error) {
 			if err := json.Unmarshal(r.Body(), userlist); err != nil {
 				return nil, fmt.Errorf("unmarshal user list error: %w", err)
 			}
+			c.UserList = userlist
 			c.userEtag = r.Header().Get("ETag")
 			return userlist.Users, nil
 		}
@@ -200,6 +202,8 @@ func (c *Client) GetUserAlive() (map[int]int, error) {
 			c.AliveMap = &AliveMap{}
 			c.AliveMap.Alive = c.fetchAliveList(
 				"/api/v1/server/UniProxy/alivelist",
+				"/api/v2/server/alivelist",
+				"/api/v1/server/alivelist",
 				"/api/v2/server/alivelist",
 			)
 
@@ -270,6 +274,30 @@ func (c *Client) ReportNodeOnlineUsers(data *map[int][]string) error {
 		payload = *data
 	}
 
+	idPayload := make(map[string][]string, len(payload))
+	for uid, ips := range payload {
+		idPayload[strconv.Itoa(uid)] = ips
+	}
+
+	uidToUUID := make(map[int]string)
+	if c.UserList != nil {
+		for _, u := range c.UserList.Users {
+			if u.Id > 0 && u.Uuid != "" {
+				uidToUUID[u.Id] = u.Uuid
+			}
+		}
+	}
+
+	mixedPayload := make(map[string][]string, len(idPayload)*2)
+	for k, v := range idPayload {
+		mixedPayload[k] = v
+	}
+	for uid, ips := range payload {
+		if uuid, ok := uidToUUID[uid]; ok {
+			mixedPayload[uuid] = ips
+		}
+	}
+
 	post := func(path string, body interface{}) error {
 		r, err := c.client.R().
 			SetBody(body).
@@ -278,31 +306,57 @@ func (c *Client) ReportNodeOnlineUsers(data *map[int][]string) error {
 		return c.checkResponse(r, path, err)
 	}
 
-	wrapper := map[string]map[int][]string{"alive": payload}
+	idWrapper := map[string]map[string][]string{"alive": idPayload}
+	mixedWrapper := map[string]map[string][]string{"alive": mixedPayload}
 
 	switch c.PanelType {
 	case "ppanel":
 		const path = "/v1/server/online"
-		if err := post(path, payload); err == nil {
+		if err := post(path, idPayload); err == nil {
 			return nil
 		}
-		return post(path, wrapper)
+		if err := post(path, idWrapper); err == nil {
+			return nil
+		}
+		if len(mixedPayload) != len(idPayload) {
+			if err := post(path, mixedPayload); err == nil {
+				return nil
+			}
+			if err := post(path, mixedWrapper); err == nil {
+				return nil
+			}
+		}
+		return fmt.Errorf("report online users failed on %s", c.assembleURL(path))
 	default:
 		paths := []string{
 			"/api/v1/server/UniProxy/alive",
 			"/api/v2/server/alive",
+			"/api/v1/server/online",
+			"/api/v2/server/online",
 		}
 		var lastErr error
 		for _, path := range paths {
-			if err := post(path, payload); err == nil {
+			if err := post(path, idPayload); err == nil {
 				return nil
 			} else {
 				lastErr = err
 			}
-			if err := post(path, wrapper); err == nil {
+			if err := post(path, idWrapper); err == nil {
 				return nil
 			} else {
 				lastErr = err
+			}
+			if len(mixedPayload) != len(idPayload) {
+				if err := post(path, mixedPayload); err == nil {
+					return nil
+				} else {
+					lastErr = err
+				}
+				if err := post(path, mixedWrapper); err == nil {
+					return nil
+				} else {
+					lastErr = err
+				}
 			}
 		}
 		return lastErr
