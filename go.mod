@@ -217,9 +217,9 @@ require (
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/pquerna/otp v1.4.0 // indirect
 	github.com/prometheus-community/pro-bing v0.4.0 // indirect
-	github.com/quic-go/qpack v0.5.1 // indirect
+	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/qtls-go1-20 v0.4.1 // indirect
-	github.com/quic-go/quic-go v0.56.0 // indirect
+	github.com/quic-go/quic-go v0.57.1 // indirect
 	github.com/refraction-networking/utls v1.8.1 // indirect
 	github.com/regfish/regfish-dnsapi-go v0.1.1 // indirect
 	github.com/riobard/go-bloom v0.0.0-20200614022211-cdc8013cb5b3 // indirect
@@ -342,4 +342,8 @@ replace github.com/sagernet/sing-box v1.12.0 => github.com/Fearless743/sing-box_
 
 replace github.com/anytls/sing-anytls v0.0.8 => github.com/Fearless743/sing-anytls v0.0.9
 
-//replace github.com/xtls/xray-core => ../Xray-core-25.12.8
+replace github.com/xtls/xray-core => ./Xray-core-25.12.8
+
+replace github.com/quic-go/quic-go => github.com/quic-go/quic-go v0.56.0
+
+replace github.com/quic-go/qpack => github.com/quic-go/qpack v0.5.1
