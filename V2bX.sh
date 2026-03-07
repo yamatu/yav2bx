@@ -326,11 +326,20 @@ show_version() {
 
 show_xhttp_help() {
   cat <<'EOF'
-XHTTP 使用说明
+协议示例说明
+XHTTP:
 1) 面板节点协议请使用 vless，network 设为 xhttp
 2) 示例配置: /etc/V2bX/config_xhttp_reality.json
 3) xhttp 参数模板: /etc/V2bX/xhttp_template.conf
-4) 主配置文件: /etc/V2bX/config.json
+
+Naive:
+1) 面板节点协议请使用 naive
+2) 本地节点 Core 请使用 sing
+3) 示例配置: /etc/V2bX/config_naive.json
+4) naive 需要 TLS 证书，CertMode 不能为 none
+
+通用:
+1) 主配置文件: /etc/V2bX/config.json
 提示: 修改完配置后执行 v2bx restart
 EOF
 }
@@ -367,7 +376,8 @@ v2bx 命令用法:
   v2bx generate        配置向导生成 config.json
   v2bx x25519          生成 X25519 密钥
   v2bx version         查看版本
-  v2bx xhttp           显示 xhttp 使用说明
+  v2bx xhttp           显示 xhttp / naive 使用说明
+  v2bx naive           显示 naive 使用说明
 EOF
 }
 
@@ -393,8 +403,8 @@ V2bX 管理菜单
 10. 取消开机自启
 11. 生成 X25519 密钥
 12. 查看 V2bX 版本
-13. 配置向导(新建/重建 config.json, 含 xhttp 预设)
-14. XHTTP 使用说明
+13. 配置向导(新建/重建 config.json, 含 xhttp / naive 预设)
+14. 协议示例说明(xhttp / naive)
 15. 退出
 ----------------------------------------
 EOF
@@ -449,6 +459,7 @@ main() {
       x25519) show_x25519 || rc=$? ;;
       version) show_version || rc=$? ;;
       xhttp) show_xhttp_help || rc=$? ;;
+      naive) show_xhttp_help || rc=$? ;;
       server) run_core_binary "$@" || rc=$? ;;
       install) run_install_script "${2:-}" || rc=$? ;;
       update) run_install_script "${2:-}" || rc=$? ;;

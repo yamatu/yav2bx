@@ -19,6 +19,10 @@ import (
 )
 
 func (b *Sing) AddUsers(p *core.AddUsersParams) (added int, err error) {
+	if p.NodeInfo.Type == "naive" {
+		return b.addNaiveUsers(p)
+	}
+
 	in, found := b.box.Inbound().Get(p.Tag)
 	if !found {
 		return 0, errors.New("the inbound not found")
@@ -135,6 +139,10 @@ type UserDeleter interface {
 }
 
 func (b *Sing) DelUsers(users []panel.UserInfo, tag string, info *panel.NodeInfo) error {
+	if info.Type == "naive" {
+		return b.delNaiveUsers(users, tag)
+	}
+
 	var del UserDeleter
 	if i, found := b.box.Inbound().Get(tag); found {
 		switch info.Type {

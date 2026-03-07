@@ -14,6 +14,7 @@ import (
 	"github.com/InazumaV/V2bX/conf"
 	"github.com/goccy/go-json"
 	"github.com/sagernet/sing-box/option"
+	singauth "github.com/sagernet/sing/common/auth"
 	F "github.com/sagernet/sing/common/format"
 	"github.com/sagernet/sing/common/json/badoption"
 )
@@ -49,7 +50,7 @@ type HttpupgradeNetworkConfig struct {
 	Host string `json:"host"`
 }
 
-func getInboundOptions(tag string, info *panel.NodeInfo, c *conf.Options) (option.Inbound, error) {
+func getInboundOptions(tag string, info *panel.NodeInfo, c *conf.Options, naiveUsers []singauth.User) (option.Inbound, error) {
 	addr, err := netip.ParseAddr(c.ListenIP)
 	if err != nil {
 		return option.Inbound{}, fmt.Errorf("the listen ip not vail")
@@ -398,6 +399,22 @@ func getInboundOptions(tag string, info *panel.NodeInfo, c *conf.Options) (optio
 				TLS: &tls,
 			},
 		}
+	case "naive":
+		if info.Naive == nil {
+			return option.Inbound{}, fmt.Errorf("missing naive node config")
+		}
+		if len(naiveUsers) == 0 {
+			return option.Inbound{}, fmt.Errorf("naive inbound requires at least one user")
+		}
+		in.Type = "naive"
+		in.Options = &option.NaiveInboundOptions{
+			ListenOptions: listen,
+			Users:         naiveUsers,
+			Network:       option.NetworkList(info.Naive.Network),
+			InboundTLSOptionsContainer: option.InboundTLSOptionsContainer{
+				TLS: &tls,
+			},
+		}
 
 	case "hysteria":
 		in.Type = "hysteria"
@@ -439,7 +456,12 @@ func getInboundOptions(tag string, info *panel.NodeInfo, c *conf.Options) (optio
 }
 
 func (b *Sing) AddNode(tag string, info *panel.NodeInfo, config *conf.Options) error {
-	c, err := getInboundOptions(tag, info, config)
+	if info.Type == "naive" {
+		b.addNaiveNode(tag, info, config)
+		return nil
+	}
+
+	inboundOptions, err := getInboundOptions(tag, info, config, nil)
 	if err != nil {
 		return err
 	}
@@ -447,10 +469,10 @@ func (b *Sing) AddNode(tag string, info *panel.NodeInfo, config *conf.Options) e
 	err = in.Create(
 		b.ctx,
 		b.box.Router(),
-		b.logFactory.NewLogger(F.ToString("inbound/", c.Type, "[", tag, "]")),
+		b.logFactory.NewLogger(F.ToString("inbound/", inboundOptions.Type, "[", tag, "]")),
 		tag,
-		c.Type,
-		c.Options,
+		inboundOptions.Type,
+		inboundOptions.Options,
 	)
 
 	if err != nil {
@@ -461,6 +483,13 @@ func (b *Sing) AddNode(tag string, info *panel.NodeInfo, config *conf.Options) e
 
 func (b *Sing) DelNode(tag string) error {
 	in := b.box.Inbound()
+	naive := b.hasNaiveNode(tag)
+	if naive {
+		b.deleteNaiveNode(tag)
+		if _, found := in.Get(tag); !found {
+			return nil
+		}
+	}
 	err := in.Remove(tag)
 	if err != nil {
 		return fmt.Errorf("delete inbound error: %s", err)

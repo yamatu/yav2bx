@@ -37,6 +37,7 @@ type NodeInfo struct {
 	Trojan      *TrojanNode
 	Tuic        *TuicNode
 	AnyTLS      *AnyTLSNode
+	Naive       *NaiveNode
 	Hysteria    *HysteriaNode
 	Hysteria2   *Hysteria2Node
 	Common      *CommonNode
@@ -125,6 +126,16 @@ type AnyTLSNode struct {
 	TlsSettings     TlsSettings   `json:"tls_settings"`
 	TlsSettingsBack *TlsSettings  `json:"tlsSettings"`
 	RealityConfig   RealityConfig `json:"-"`
+}
+
+type NaiveNode struct {
+	CommonNode
+	Network             string          `json:"network"`
+	NetworkSettings     json.RawMessage `json:"network_settings"`
+	NetworkSettingsBack json.RawMessage `json:"networkSettings"`
+	Tls                 int             `json:"tls"`
+	TlsSettings         TlsSettings     `json:"tls_settings"`
+	TlsSettingsBack     *TlsSettings    `json:"tlsSettings"`
 }
 
 type HysteriaNode struct {
@@ -240,8 +251,26 @@ func (c *Client) GetNodeInfo() (node *NodeInfo, err error) {
 			case "anytls":
 				node.AnyTLS = &AnyTLSNode{}
 				err = json.Unmarshal(node.Config, node.AnyTLS)
+			case "naive":
+				node.Naive = &NaiveNode{}
+				err = json.Unmarshal(node.Config, node.Naive)
 			default:
 				err = fmt.Errorf("unknown protocol:%s", node.Protocol)
+			}
+
+			switch node.Protocol {
+			case "anytls":
+				if node.AnyTLS.TlsSettingsBack != nil {
+					node.AnyTLS.TlsSettings = *node.AnyTLS.TlsSettingsBack
+					node.AnyTLS.TlsSettingsBack = nil
+				}
+				node.Security = node.AnyTLS.Tls
+			case "naive":
+				if node.Naive.TlsSettingsBack != nil {
+					node.Naive.TlsSettings = *node.Naive.TlsSettingsBack
+					node.Naive.TlsSettingsBack = nil
+				}
+				node.Security = node.Naive.Tls
 			}
 
 			if err != nil {
@@ -350,6 +379,19 @@ func (c *Client) GetNodeInfo() (node *NodeInfo, err error) {
 				cm = &rsp.CommonNode
 				node.AnyTLS = rsp
 				node.Security = node.AnyTLS.Tls
+			case "naive":
+				rsp := &NaiveNode{}
+				err = json.Unmarshal(r.Body(), rsp)
+				if err != nil {
+					return nil, fmt.Errorf("decode naive params error: %s", err)
+				}
+				if rsp.TlsSettingsBack != nil {
+					rsp.TlsSettings = *rsp.TlsSettingsBack
+					rsp.TlsSettingsBack = nil
+				}
+				cm = &rsp.CommonNode
+				node.Naive = rsp
+				node.Security = node.Naive.Tls
 			case "hysteria":
 				rsp := &HysteriaNode{}
 				err = json.Unmarshal(r.Body(), rsp)

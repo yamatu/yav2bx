@@ -54,13 +54,14 @@ V2BX_SKIP_BASE_INSTALL=1 bash install.sh v1.0.7
 bash <(curl -Ls https://raw.githubusercontent.com/yamatu/yabx/main/install.sh) v1.0.7
 ```
 
-安装脚本会自动写入 systemd 服务，并保留你已有的 `/etc/V2bX/config.json`。首次安装会额外放置 XHTTP 示例配置：
+安装脚本会自动写入 systemd 服务，并保留你已有的 `/etc/V2bX/config.json`。首次安装会额外放置 XHTTP / Naive 示例配置：
 
 安装完成后，执行 `v2bx` 会进入数字菜单（0/1/2...）管理模式，可直接进行安装/更新/重启/日志/配置生成等操作。
 
-若仓库暂未发布 Release，脚本会自动切换为源码编译安装（默认包含 xray 内核编译标签），同样可用 xhttp。
+若仓库暂未发布 Release，脚本会自动切换为源码编译安装（默认包含 `xray + sing` 内核编译标签），同样可用 xhttp / naive。
 
 - `/etc/V2bX/config_xhttp_reality.json`
+- `/etc/V2bX/config_naive.json`
 - `/etc/V2bX/xhttp_template.conf`
 
 ### 配置文件位置
@@ -72,7 +73,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/yamatu/yabx/main/install.sh) v
 - 自定义入站：`/etc/V2bX/custom_inbound.json`
 
 可通过 `v2bx` 菜单中的 `0` 编辑主配置，或 `13` 使用向导新建/重建配置。
-`13` 向导已支持 `vless + xhttp` 预设，并可选择 `reality`（默认）或 `tls`。
+`13` 向导已支持 `vless + xhttp` 预设，以及 `naive (sing)` 预设。
 若选择 `CertMode=file`，向导会提示输入证书和私钥的实际路径（不再固定写死 `/etc/V2bX/`）。
 
 ### XHTTP 使用说明
@@ -84,6 +85,12 @@ bash <(curl -Ls https://raw.githubusercontent.com/yamatu/yabx/main/install.sh) v
 - 完整示例可参考 `example/config_xhttp_reality.json`。
 - 若面板的 `headers`/`sockopt`/`tlsSettings` 传空数组（`[]`），会导致 xray 报错；建议面板侧传对象（`{}`）。
 - 若 `mode=stream-one` 且面板仍下发了 `downloadSettings`，后端会自动忽略该字段以避免启动失败。
+
+### Naive 使用说明
+
+- 面板节点请使用 `naive` 协议，本地 `config.json` 中节点 `Core` 请使用 `sing`。
+- 安装后可直接参考 `/etc/V2bX/config_naive.json`，或用 `v2bx` 菜单的 `13` 生成 naive 配置。
+- naive 需要 TLS 证书，建议不要使用 `CertMode=none`。
 
 ### XBoard 对接说明
 
@@ -101,8 +108,8 @@ bash <(curl -Ls https://raw.githubusercontent.com/yamatu/yabx/main/install.sh) v
 
 ## 构建
 ``` bash
-# 默认构建 xray 内核（推荐，支持 xhttp）
-go build -v -o ./V2bX -tags "xray with_reality_server with_quic with_grpc with_utls with_wireguard with_acme" -trimpath -ldflags "-s -w -buildid="
+# 默认构建 xray + sing 内核（支持 xhttp / naive）
+go build -v -o ./V2bX -tags "xray sing with_reality_server with_quic with_grpc with_utls with_wireguard with_acme" -trimpath -ldflags "-s -w -buildid="
 
 # 如需自定义 tags，可在安装脚本中设置：
 # V2BX_BUILD_TAGS="xray sing hysteria2 with_reality_server with_quic with_grpc with_utls with_wireguard with_acme" bash install.sh

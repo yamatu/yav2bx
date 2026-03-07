@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/sagernet/sing-box/include"
 	"github.com/sagernet/sing-box/log"
@@ -29,6 +30,8 @@ type Sing struct {
 	hookServer *HookServer
 	router     adapter.Router
 	logFactory log.Factory
+	naiveMu    sync.Mutex
+	naiveState map[string]*naiveInboundState
 }
 
 func init() {
@@ -79,6 +82,7 @@ func New(c *conf.CoreConfig) (vCore.Core, error) {
 		hookServer: hs,
 		router:     b.Router(),
 		logFactory: b.LogFactory(),
+		naiveState: make(map[string]*naiveInboundState),
 	}, nil
 }
 
@@ -98,6 +102,7 @@ func (b *Sing) Protocols() []string {
 		"trojan",
 		"tuic",
 		"anytls",
+		"naive",
 		"hysteria",
 		"hysteria2",
 	}

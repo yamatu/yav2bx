@@ -59,6 +59,7 @@ func New(c *conf.ApiConfig) (*Client, error) {
 		"hysteria2",
 		"tuic",
 		"anytls",
+		"naive",
 		"vless":
 	default:
 		return nil, fmt.Errorf("unsupported Node type: %s", c.NodeType)

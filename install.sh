@@ -309,7 +309,7 @@ install_from_source() {
   local src_dir
   local build_tags
 
-  build_tags="${V2BX_BUILD_TAGS:-xray with_reality_server with_quic with_grpc with_utls with_wireguard with_acme}"
+  build_tags="${V2BX_BUILD_TAGS:-xray sing with_reality_server with_quic with_grpc with_utls with_wireguard with_acme}"
   src_dir="$(mktemp -d /tmp/v2bx-src.XXXXXX)"
 
   log_info "Installing from source ref: ${ref}"
@@ -340,7 +340,7 @@ install_from_source() {
   chmod +x "$INSTALL_DIR/$BIN_NAME"
 
   if [[ -d "$src_dir/example" ]]; then
-    for file in config.json dns.json route.json custom_outbound.json custom_inbound.json config_xhttp_reality.json geoip.dat geosite.dat; do
+    for file in config.json dns.json route.json custom_outbound.json custom_inbound.json config_xhttp_reality.json config_naive.json geoip.dat geosite.dat; do
       if [[ -f "$src_dir/example/$file" ]]; then
         cp -f "$src_dir/example/$file" "$INSTALL_DIR/$file"
       fi
@@ -409,8 +409,26 @@ write_default_xhttp_template() {
 EOF
 }
 
+ensure_example_asset() {
+  local ref="$1"
+  local file="$2"
+
+  if [[ -f "$INSTALL_DIR/$file" ]]; then
+    return 0
+  fi
+
+  if ! download_file "https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${ref}/example/${file}" "$INSTALL_DIR/$file"; then
+    rm -f "$INSTALL_DIR/$file"
+    download_file "https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/example/${file}" "$INSTALL_DIR/$file" >/dev/null 2>&1 || true
+  fi
+}
+
 install_assets() {
+  local ref="${1:-main}"
   mkdir -p "$CONFIG_DIR"
+
+  ensure_example_asset "$ref" "config_xhttp_reality.json"
+  ensure_example_asset "$ref" "config_naive.json"
 
   if [[ -f "$INSTALL_DIR/geoip.dat" ]]; then
     cp -f "$INSTALL_DIR/geoip.dat" "$CONFIG_DIR/geoip.dat"
@@ -425,6 +443,7 @@ install_assets() {
   copy_if_missing "$INSTALL_DIR/custom_outbound.json" "$CONFIG_DIR/custom_outbound.json"
   copy_if_missing "$INSTALL_DIR/custom_inbound.json" "$CONFIG_DIR/custom_inbound.json"
   copy_if_missing "$INSTALL_DIR/config_xhttp_reality.json" "$CONFIG_DIR/config_xhttp_reality.json"
+  copy_if_missing "$INSTALL_DIR/config_naive.json" "$CONFIG_DIR/config_naive.json"
 
   if [[ ! -f "$CONFIG_DIR/xhttp_template.conf" ]]; then
     if [[ -f "$INSTALL_DIR/xhttp_template.conf" ]]; then
@@ -522,13 +541,14 @@ main() {
     install_from_source "$SOURCE_REF"
   fi
 
-  install_assets
   local script_ref="main"
   if [[ "$INSTALL_MODE" == "release" && -n "$VERSION" ]]; then
     script_ref="$VERSION"
   elif [[ "$INSTALL_MODE" == "source" && -n "$SOURCE_REF" ]]; then
     script_ref="$SOURCE_REF"
   fi
+
+  install_assets "$script_ref"
   install_manager_scripts "$script_ref"
   install_service
 
@@ -540,7 +560,7 @@ main() {
     fi
   else
     log_warn "First install detected. Edit /etc/V2bX/config.json before starting service."
-    log_warn "XHTTP examples: /etc/V2bX/config_xhttp_reality.json and /etc/V2bX/xhttp_template.conf"
+    log_warn "Examples: /etc/V2bX/config_xhttp_reality.json /etc/V2bX/config_naive.json /etc/V2bX/xhttp_template.conf"
     log_info "Start command: systemctl start V2bX"
   fi
 
