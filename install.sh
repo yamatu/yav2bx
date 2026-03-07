@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_OWNER="yamatu"
-REPO_NAME="yav2bx"
+REPO_NAME="yabx"
 BIN_NAME="V2bX"
 INSTALL_DIR="/usr/local/V2bX"
 CONFIG_DIR="/etc/V2bX"
@@ -479,7 +479,7 @@ install_service() {
   cat > "$SERVICE_FILE" <<'EOF'
 [Unit]
 Description=V2bX Service
-Documentation=https://github.com/yamatu/yav2bx
+Documentation=https://github.com/yamatu/yabx
 After=network-online.target nss-lookup.target
 Wants=network-online.target
 

@@ -2,7 +2,7 @@
 set -u
 
 REPO_OWNER="yamatu"
-REPO_NAME="yav2bx"
+REPO_NAME="yabx"
 
 INSTALL_DIR="/usr/local/V2bX"
 CONFIG_DIR="/etc/V2bX"

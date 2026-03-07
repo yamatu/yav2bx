@@ -16,7 +16,7 @@ var (
 		Use:   "update",
 		Short: "Update V2bX version",
 		Run: func(_ *cobra.Command, _ []string) {
-			cmd := "wget -N -O /tmp/v2bx_install.sh https://raw.githubusercontent.com/yamatu/yav2bx/main/install.sh && bash /tmp/v2bx_install.sh"
+			cmd := "wget -N -O /tmp/v2bx_install.sh https://raw.githubusercontent.com/yamatu/yabx/main/install.sh && bash /tmp/v2bx_install.sh"
 			if targetVersion != "" {
 				cmd += " " + targetVersion
 			}
