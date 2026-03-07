@@ -9,13 +9,13 @@ import (
 	_ "github.com/xtls/xray-core/app/proxyman/outbound"
 
 	// Default commander and all its services. This is an optional feature.
-	//_ "github.com/xtls/xray-core/app/commander"
-	//_ "github.com/xtls/xray-core/app/log/command"
-	//_ "github.com/xtls/xray-core/app/proxyman/command"
-	//_ "github.com/xtls/xray-core/app/stats/command"
+	_ "github.com/xtls/xray-core/app/commander"
+	_ "github.com/xtls/xray-core/app/log/command"
+	_ "github.com/xtls/xray-core/app/proxyman/command"
+	_ "github.com/xtls/xray-core/app/stats/command"
 
 	// Developer preview services
-	//_ "github.com/xtls/xray-core/app/observatory/command"
+	_ "github.com/xtls/xray-core/app/observatory/command"
 
 	// Other optional features.
 	_ "github.com/xtls/xray-core/app/dns"
@@ -31,7 +31,7 @@ import (
 	_ "github.com/xtls/xray-core/transport/internet/tagged/taggedimpl"
 
 	// Developer preview features
-	//_ "github.com/xtls/xray-core/app/observatory"
+	_ "github.com/xtls/xray-core/app/observatory"
 
 	// Inbound and outbound proxies.
 	_ "github.com/xtls/xray-core/proxy/blackhole"
@@ -41,18 +41,17 @@ import (
 	_ "github.com/xtls/xray-core/proxy/http"
 	_ "github.com/xtls/xray-core/proxy/loopback"
 	_ "github.com/xtls/xray-core/proxy/shadowsocks"
-	_ "github.com/xtls/xray-core/proxy/shadowsocks_2022"
 	_ "github.com/xtls/xray-core/proxy/socks"
 	_ "github.com/xtls/xray-core/proxy/trojan"
 	_ "github.com/xtls/xray-core/proxy/vless/inbound"
 	_ "github.com/xtls/xray-core/proxy/vless/outbound"
 	_ "github.com/xtls/xray-core/proxy/vmess/inbound"
 	_ "github.com/xtls/xray-core/proxy/vmess/outbound"
-
-	//_ "github.com/xtls/xray-core/proxy/wireguard"
+	_ "github.com/xtls/xray-core/proxy/wireguard"
 
 	// Transports
 	_ "github.com/xtls/xray-core/transport/internet/grpc"
+	_ "github.com/xtls/xray-core/transport/internet/httpupgrade"
 	_ "github.com/xtls/xray-core/transport/internet/kcp"
 	_ "github.com/xtls/xray-core/transport/internet/reality"
 	_ "github.com/xtls/xray-core/transport/internet/splithttp"
@@ -64,9 +63,15 @@ import (
 	// Transport headers
 	_ "github.com/xtls/xray-core/transport/internet/headers/http"
 	_ "github.com/xtls/xray-core/transport/internet/headers/noop"
-	_ "github.com/xtls/xray-core/transport/internet/headers/srtp"
-	_ "github.com/xtls/xray-core/transport/internet/headers/tls"
-	_ "github.com/xtls/xray-core/transport/internet/headers/utp"
-	_ "github.com/xtls/xray-core/transport/internet/headers/wechat"
-	_ "github.com/xtls/xray-core/transport/internet/headers/wireguard"
+
+	// JSON & TOML & YAML
+	_ "github.com/xtls/xray-core/main/json"
+	_ "github.com/xtls/xray-core/main/toml"
+	_ "github.com/xtls/xray-core/main/yaml"
+
+	// Load config from file or http(s)
+	_ "github.com/xtls/xray-core/main/confloader/external"
+
+	// Commands
+	_ "github.com/xtls/xray-core/main/commands/all"
 )
