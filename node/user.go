@@ -2,7 +2,6 @@ package node
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/InazumaV/V2bX/api/panel"
 	"github.com/InazumaV/V2bX/common/serverstatus"
@@ -16,8 +15,8 @@ func (c *Controller) reportUserTrafficTask() (err error) {
 	for i := range c.userList {
 		up, down := c.server.GetUserTraffic(c.tag, c.userList[i].Uuid, true)
 		if up > 0 || down > 0 {
-			if c.LimitConfig.EnableDynamicSpeedLimit {
-				c.traffic[c.userList[i].Uuid] += up + down
+			if c.dynamicSpeedLimitEnabled() {
+				c.addTraffic(c.userList[i].Uuid, up+down)
 			}
 			userTraffic = append(userTraffic, panel.UserTraffic{
 				UID:      (c.userList)[i].Id,
@@ -141,15 +140,54 @@ func (c *Controller) reportUserTrafficTask() (err error) {
 	return nil
 }
 
+func (c *Controller) syncOnlineUsersTask() error {
+	if c.limiter == nil {
+		return nil
+	}
+
+	data, err := c.limiter.GetOnlineIPMap()
+	if err != nil {
+		log.WithFields(log.Fields{
+			"tag": c.tag,
+			"err": err,
+		}).Warn("Build online IP sync payload failed")
+		return nil
+	}
+
+	if err = c.apiClient.ReportNodeOnlineUsers(&data); err != nil {
+		log.WithFields(log.Fields{
+			"tag": c.tag,
+			"err": err,
+		}).Warn("Sync online IP data failed")
+	}
+
+	aliveMap, err := c.apiClient.GetUserAlive()
+	if err != nil {
+		log.WithFields(log.Fields{
+			"tag": c.tag,
+			"err": err,
+		}).Warn("Refresh synced alive list failed")
+		return nil
+	}
+
+	c.aliveMap = aliveMap
+	c.limiter.SetAliveList(aliveMap)
+	return nil
+}
+
+func userCompareKey(user panel.UserInfo) string {
+	return fmt.Sprintf("%d|%s|%d|%d", user.Id, user.Uuid, user.SpeedLimit, user.DeviceLimit)
+}
+
 func compareUserList(old, new []panel.UserInfo) (deleted, added []panel.UserInfo) {
 	oldMap := make(map[string]int)
 	for i, user := range old {
-		key := user.Uuid + strconv.Itoa(user.SpeedLimit)
+		key := userCompareKey(user)
 		oldMap[key] = i
 	}
 
 	for _, user := range new {
-		key := user.Uuid + strconv.Itoa(user.SpeedLimit)
+		key := userCompareKey(user)
 		if _, exists := oldMap[key]; !exists {
 			added = append(added, user)
 		} else {

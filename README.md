@@ -1,12 +1,7 @@
 # V2bX
 
-[![](https://img.shields.io/badge/TgChat-UnOfficialV2Board%E4%BA%A4%E6%B5%81%E7%BE%A4-green)](https://t.me/unofficialV2board)
-[![](https://img.shields.io/badge/TgChat-YuzukiProjects%E4%BA%A4%E6%B5%81%E7%BE%A4-blue)](https://t.me/YuzukiProjects)
-
 A V2board node server based on multi core, modified from XrayR.  
 一个基于多种内核的V2board节点服务端，修改自XrayR，支持V2ay,Trojan,Shadowsocks协议。
-
-**注意： 本项目需要搭配[修改版V2board](https://github.com/wyx2685/v2board)**
 
 ## 特点
 
@@ -36,12 +31,10 @@ A V2board node server based on multi core, modified from XrayR.
 | 连接数限制     | √     | √      | √           | √         |
 | 跨节点IP数限制  |√      |√       |√            |√          |
 | 按照用户限速    | √     | √      | √           | √         |
-| 动态限速(未测试) | √     | √      | √           | √         |
+| 动态限速      | √     | √      | √           | √         |
 
 ## TODO
 
-- [ ] 重新实现动态限速
-- [ ] 重新实现在线IP同步（跨节点在线IP限制）
 - [ ] 完善使用文档
 
 ## 软件安装
@@ -99,6 +92,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/yamatu/yabx/main/install.sh) v
 - 节点状态上报（`/status`）支持 XBoard 所需结构：`cpu`、`mem.total/used`、`swap.total/used`、`disk.total/used`。
 - 节点在线数会按 `uid+ip` 粒度尽量贴近设备数；若同一用户在同一公网 IP 下多设备并发，要做到绝对精确需每设备独立 UUID。
 - XBoard 的节点红绿灯绿色依赖 `last_check_at` + `last_push_at`；后端已针对 XBoard 将上报周期约束在 20s~4m，并在启动时立即上报一次。
+- 已支持通过 `/alive` + `/alivelist` 同步在线 IP，用于跨节点在线 IP 限制。
 - XBoard 的在线/流量统计由队列异步入库，请确保队列在运行：`php artisan queue:work --queue=online_sync,traffic_fetch,stat,default --tries=1`。
 
 ### 手动安装

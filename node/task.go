@@ -27,6 +27,72 @@ func (c *Controller) normalizedPushInterval(interval time.Duration) time.Duratio
 	return interval
 }
 
+func (c *Controller) dynamicSpeedLimitEnabled() bool {
+	return c.LimitConfig.EnableDynamicSpeedLimit && c.LimitConfig.DynamicSpeedLimitConfig != nil
+}
+
+func (c *Controller) dynamicSpeedLimitInterval() time.Duration {
+	if c.dynamicSpeedLimitEnabled() && c.LimitConfig.DynamicSpeedLimitConfig.Periodic > 0 {
+		return time.Duration(c.LimitConfig.DynamicSpeedLimitConfig.Periodic) * time.Second
+	}
+
+	return 60 * time.Second
+}
+
+func (c *Controller) onlineIPSyncEnabled() bool {
+	if c.apiClient == nil || c.apiClient.PanelType == "ppanel" {
+		return false
+	}
+
+	if c.LimitConfig.EnableIpRecorder &&
+		c.LimitConfig.IpRecorderConfig != nil &&
+		c.LimitConfig.IpRecorderConfig.EnableIpSync {
+		return true
+	}
+
+	for _, user := range c.userList {
+		if user.DeviceLimit > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (c *Controller) onlineIPSyncInterval() time.Duration {
+	if c.LimitConfig.IpRecorderConfig != nil && c.LimitConfig.IpRecorderConfig.Periodic > 0 {
+		return time.Duration(c.LimitConfig.IpRecorderConfig.Periodic) * time.Second
+	}
+
+	return 30 * time.Second
+}
+
+func (c *Controller) ensureOnlineIPSyncTask() {
+	if !c.onlineIPSyncEnabled() {
+		if c.onlineIpReportPeriodic != nil {
+			c.onlineIpReportPeriodic.Close()
+			c.onlineIpReportPeriodic = nil
+		}
+		return
+	}
+
+	interval := c.onlineIPSyncInterval()
+	if c.onlineIpReportPeriodic != nil && c.onlineIpReportPeriodic.Interval == interval {
+		return
+	}
+
+	if c.onlineIpReportPeriodic != nil {
+		c.onlineIpReportPeriodic.Close()
+	}
+
+	c.onlineIpReportPeriodic = &task.Task{
+		Interval: interval,
+		Execute:  c.syncOnlineUsersTask,
+	}
+	log.WithField("tag", c.tag).Info("Start online IP sync")
+	_ = c.onlineIpReportPeriodic.Start(true)
+}
+
 func (c *Controller) startTasks(node *panel.NodeInfo) {
 	pushInterval := c.normalizedPushInterval(node.PushInterval)
 
@@ -58,14 +124,16 @@ func (c *Controller) startTasks(node *panel.NodeInfo) {
 			_ = c.renewCertPeriodic.Start(true)
 		}
 	}
-	if c.LimitConfig.EnableDynamicSpeedLimit {
-		c.traffic = make(map[string]int64)
+	if c.dynamicSpeedLimitEnabled() {
+		c.resetTraffic()
 		c.dynamicSpeedLimitPeriodic = &task.Task{
-			Interval: time.Duration(c.LimitConfig.DynamicSpeedLimitConfig.Periodic) * time.Second,
+			Interval: c.dynamicSpeedLimitInterval(),
 			Execute:  c.SpeedChecker,
 		}
 		log.Printf("[%s: %d] Start dynamic speed limit", c.apiClient.NodeType, c.apiClient.NodeId)
+		_ = c.dynamicSpeedLimitPeriodic.Start(false)
 	}
+	c.ensureOnlineIPSyncTask()
 }
 
 func (c *Controller) nodeInfoMonitor() (err error) {
@@ -102,7 +170,7 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 		if newU != nil {
 			c.userList = newU
 		}
-		c.traffic = make(map[string]int64)
+		c.resetTraffic()
 		// Remove old node
 		log.WithField("tag", c.tag).Info("Node changed, reload")
 		err = c.server.DelNode(c.tag)
@@ -125,7 +193,7 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 		}
 		// update alive list
 		if newA != nil {
-			c.limiter.AliveList = newA
+			c.limiter.SetAliveList(newA)
 		}
 		// Update rule
 		err = c.limiter.UpdateRule(&newN.Rules)
@@ -182,13 +250,14 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 			c.userReportPeriodic.Close()
 			_ = c.userReportPeriodic.Start(true)
 		}
+		c.ensureOnlineIPSyncTask()
 		log.WithField("tag", c.tag).Infof("Added %d new users", len(c.userList))
 		// exit
 		return nil
 	}
 	// update alive list
 	if newA != nil {
-		c.limiter.AliveList = newA
+		c.limiter.SetAliveList(newA)
 	}
 	// node no changed, check users
 	if len(newU) == 0 {
@@ -232,13 +301,14 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 			return nil
 		}
 		// clear traffic record
-		if c.LimitConfig.EnableDynamicSpeedLimit {
+		if c.dynamicSpeedLimitEnabled() {
 			for i := range deleted {
-				delete(c.traffic, deleted[i].Uuid)
+				c.deleteTraffic(deleted[i].Uuid)
 			}
 		}
 	}
 	c.userList = newU
+	c.ensureOnlineIPSyncTask()
 	if len(added)+len(deleted) != 0 {
 		log.WithField("tag", c.tag).
 			Infof("%d user deleted, %d user added", len(deleted), len(added))
@@ -247,13 +317,22 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 }
 
 func (c *Controller) SpeedChecker() error {
-	for u, t := range c.traffic {
-		if t >= c.LimitConfig.DynamicSpeedLimitConfig.Traffic {
-			err := c.limiter.UpdateDynamicSpeedLimit(c.tag, u,
-				c.LimitConfig.DynamicSpeedLimitConfig.SpeedLimit,
-				time.Now().Add(time.Duration(c.LimitConfig.DynamicSpeedLimitConfig.ExpireTime)*time.Minute))
-			log.WithField("err", err).Error("Update dynamic speed limit failed")
-			delete(c.traffic, u)
+	if !c.dynamicSpeedLimitEnabled() {
+		return nil
+	}
+
+	for _, uuid := range c.consumeDynamicSpeedLimitUsers() {
+		err := c.limiter.UpdateDynamicSpeedLimit(
+			c.tag,
+			uuid,
+			c.LimitConfig.DynamicSpeedLimitConfig.SpeedLimit,
+			time.Now().Add(time.Duration(c.LimitConfig.DynamicSpeedLimitConfig.ExpireTime)*time.Minute),
+		)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"tag": c.tag,
+				"err": err,
+			}).Error("Update dynamic speed limit failed")
 		}
 	}
 	return nil

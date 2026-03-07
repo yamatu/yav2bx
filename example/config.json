@@ -35,6 +35,11 @@
         "SpeedLimit": 0,
         "IPLimit": 0,
         "ConnLimit": 0,
+        "EnableIpRecorder": false,
+        "IpRecorderConfig": {
+          "Periodic": 30,
+          "EnableIpSync": true
+        },
         "EnableDynamicSpeedLimit": false,
         "DynamicSpeedLimitConfig": {
           "Periodic": 60,

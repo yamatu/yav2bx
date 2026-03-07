@@ -134,6 +134,18 @@
         // 用户连接数限制
         "ConnLimit": 0,
 
+        // 开启在线IP同步（用于跨节点在线IP限制）
+        "EnableIpRecorder": false,
+
+        // 在线IP同步配置
+        "IpRecorderConfig": {
+          // 同步周期（秒）
+          "Periodic": 30,
+
+          // 对接支持 /alive 与 /alivelist 的面板时开启在线IP同步
+          "EnableIpSync": true
+        },
+
         // 开启动态限速
         "EnableDynamicSpeedLimit": false,
 

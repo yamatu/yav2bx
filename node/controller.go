@@ -3,6 +3,7 @@ package node
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/InazumaV/V2bX/api/panel"
 	"github.com/InazumaV/V2bX/common/task"
@@ -17,6 +18,7 @@ type Controller struct {
 	apiClient                 *panel.Client
 	tag                       string
 	limiter                   *limiter.Limiter
+	trafficMu                 sync.Mutex
 	traffic                   map[string]int64
 	userList                  []panel.UserInfo
 	aliveMap                  map[int]int
@@ -124,4 +126,56 @@ func (c *Controller) Close() error {
 
 func (c *Controller) buildNodeTag(node *panel.NodeInfo) string {
 	return fmt.Sprintf("[%s]-%s:%d", c.apiClient.APIHost, node.Type, node.Id)
+}
+
+func (c *Controller) resetTraffic() {
+	c.trafficMu.Lock()
+	defer c.trafficMu.Unlock()
+
+	c.traffic = make(map[string]int64)
+}
+
+func (c *Controller) addTraffic(uuid string, traffic int64) {
+	if traffic <= 0 {
+		return
+	}
+
+	c.trafficMu.Lock()
+	defer c.trafficMu.Unlock()
+
+	if c.traffic == nil {
+		c.traffic = make(map[string]int64)
+	}
+	c.traffic[uuid] += traffic
+}
+
+func (c *Controller) deleteTraffic(uuid string) {
+	c.trafficMu.Lock()
+	defer c.trafficMu.Unlock()
+
+	delete(c.traffic, uuid)
+}
+
+func (c *Controller) consumeDynamicSpeedLimitUsers() []string {
+	if !c.dynamicSpeedLimitEnabled() {
+		return nil
+	}
+
+	threshold := c.LimitConfig.DynamicSpeedLimitConfig.Traffic
+	if threshold <= 0 {
+		return nil
+	}
+
+	c.trafficMu.Lock()
+	defer c.trafficMu.Unlock()
+
+	matched := make([]string, 0)
+	for uuid, traffic := range c.traffic {
+		if traffic >= threshold {
+			matched = append(matched, uuid)
+			delete(c.traffic, uuid)
+		}
+	}
+
+	return matched
 }
