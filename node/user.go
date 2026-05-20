@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/InazumaV/V2bX/api/panel"
+	"github.com/InazumaV/V2bX/common/netutil"
 	"github.com/InazumaV/V2bX/common/serverstatus"
 	log "github.com/sirupsen/logrus"
 )
@@ -12,7 +13,6 @@ import (
 func (c *Controller) reportUserTrafficTask() (err error) {
 	// Get User traffic
 	userTraffic := make([]panel.UserTraffic, 0)
-	reportedUID := make(map[int]struct{})
 	for i := range c.userList {
 		up, down := c.server.GetUserTraffic(c.tag, c.userList[i].Uuid, true)
 		if up > 0 || down > 0 {
@@ -23,7 +23,6 @@ func (c *Controller) reportUserTrafficTask() (err error) {
 				UID:      (c.userList)[i].Id,
 				Upload:   up,
 				Download: down})
-			reportedUID[(c.userList)[i].Id] = struct{}{}
 		}
 	}
 
@@ -55,18 +54,6 @@ func (c *Controller) reportUserTrafficTask() (err error) {
 			}
 		}
 		data := buildOnlineIPPayload(result, c.userList)
-
-		// XBoard node online count is based on /push payload count.
-		// Include zero-traffic online users for non-ppanel to keep node online count aligned with online users.
-		if c.apiClient.PanelType != "ppanel" {
-			for _, onlineuser := range result {
-				uid := onlineuser.UID
-				if _, ok := reportedUID[uid]; !ok {
-					userTraffic = append(userTraffic, panel.UserTraffic{UID: uid, Upload: 0, Download: 0})
-					reportedUID[uid] = struct{}{}
-				}
-			}
-		}
 
 		if err = c.apiClient.ReportNodeOnlineUsers(&data); err != nil {
 			log.WithFields(log.Fields{
@@ -168,56 +155,63 @@ func (c *Controller) syncOnlineUsersTask() error {
 }
 
 func dedupeOnlineUsersByIP(users []panel.OnlineUser) []panel.OnlineUser {
-	if len(users) <= 1 {
-		return users
+	type onlineKey struct {
+		uid int
+		ip  string
 	}
-
-	seen := make(map[string]struct{}, len(users))
+	seen := make(map[onlineKey]struct{}, len(users))
 	result := make([]panel.OnlineUser, 0, len(users))
 	for _, onlineUser := range users {
-		if onlineUser.IP == "" {
+		ip := netutil.NormalizeIP(onlineUser.IP)
+		if ip == "" {
 			continue
 		}
-		if _, ok := seen[onlineUser.IP]; ok {
+		key := onlineKey{uid: onlineUser.UID, ip: ip}
+		if _, ok := seen[key]; ok {
 			continue
 		}
-		seen[onlineUser.IP] = struct{}{}
-		result = append(result, onlineUser)
+		seen[key] = struct{}{}
+		result = append(result, panel.OnlineUser{UID: onlineUser.UID, IP: ip})
 	}
 
 	sort.Slice(result, func(i, j int) bool {
-		if result[i].IP != result[j].IP {
-			return result[i].IP < result[j].IP
+		if result[i].UID != result[j].UID {
+			return result[i].UID < result[j].UID
 		}
-		return result[i].UID < result[j].UID
+		return result[i].IP < result[j].IP
 	})
 	return result
 }
 
 func dedupeOnlineIPMapByIP(data map[int][]string) map[int][]string {
-	if len(data) <= 1 {
-		return data
-	}
-
 	uids := make([]int, 0, len(data))
 	for uid := range data {
 		uids = append(uids, uid)
 	}
 	sort.Ints(uids)
 
-	seen := make(map[string]struct{})
+	type onlineKey struct {
+		uid int
+		ip  string
+	}
+	seen := make(map[onlineKey]struct{})
 	result := make(map[int][]string, len(data))
 	for _, uid := range uids {
 		for _, ip := range data[uid] {
+			ip = netutil.NormalizeIP(ip)
 			if ip == "" {
 				continue
 			}
-			if _, ok := seen[ip]; ok {
+			key := onlineKey{uid: uid, ip: ip}
+			if _, ok := seen[key]; ok {
 				continue
 			}
-			seen[ip] = struct{}{}
+			seen[key] = struct{}{}
 			result[uid] = append(result[uid], ip)
 		}
+	}
+	for uid := range result {
+		sort.Strings(result[uid])
 	}
 	return result
 }
@@ -265,12 +259,13 @@ func buildOnlineIPMapPayload(data map[int][]string, _ []panel.UserInfo) map[int]
 		return map[int][]string{}
 	}
 
-	payload := make(map[int][]string, len(data))
-	for uid, ips := range data {
+	deduped := dedupeOnlineIPMapByIP(data)
+	payload := make(map[int][]string, len(deduped))
+	for uid, ips := range deduped {
 		if len(ips) == 0 {
 			continue
 		}
-		payload[uid] = ips
+		payload[uid] = append([]string(nil), ips...)
 	}
 	return payload
 }

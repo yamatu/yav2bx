@@ -288,8 +288,14 @@ func (c *Client) ReportNodeOnlineUsers(data *map[int][]string) error {
 	}
 
 	idPayload := make(map[string][]string, len(payload))
+	onlinePayload := make(map[string]int, len(payload))
 	for uid, ips := range payload {
-		idPayload[strconv.Itoa(uid)] = ips
+		if len(ips) == 0 {
+			continue
+		}
+		key := strconv.Itoa(uid)
+		idPayload[key] = ips
+		onlinePayload[key] = len(ips)
 	}
 
 	uidToUUID := make(map[int]string)
@@ -341,6 +347,14 @@ func (c *Client) ReportNodeOnlineUsers(data *map[int][]string) error {
 		}
 		return fmt.Errorf("report online users failed on %s", c.assembleURL(path))
 	default:
+		reportPayload := map[string]interface{}{
+			"alive":  idPayload,
+			"online": onlinePayload,
+		}
+		if err := post("/api/v2/server/report", reportPayload); err == nil {
+			return nil
+		}
+
 		paths := []string{
 			"/api/v1/server/UniProxy/alive",
 			"/api/v2/server/alive",
